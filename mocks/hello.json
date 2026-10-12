@@ -1,0 +1,7 @@
+{
+  "method": "GET",
+  "path": "/api/hello",
+  "status": 200,
+  "headers": { "X-Mock": "true" },
+  "body": { "message": "Hello from mock-server!" }
+}
