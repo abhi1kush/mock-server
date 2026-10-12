@@ -1,0 +1,20 @@
+# OS / editors
+.DS_Store
+.idea/
+*.iml
+.vscode/
+*.log
+# Java / Maven
+target/
+!.mvn/wrapper/maven-wrapper.properties
+# Go
+golang/bin/
+*.exe
+# Rust
+rust/target/
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
