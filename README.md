@@ -30,7 +30,7 @@ Every server exposes `GET /health` → `{"status":"UP"}` and returns a 404 JSON 
 
 ```bash
 cd springboot
-./start.sh            # PORT=8080, MOCKS_DIR=../mocks by default
+./start.sh            # port from springboot/config/mock-server.properties (8080); PORT=9090 overrides
 curl localhost:8080/api/hello
 ```
 

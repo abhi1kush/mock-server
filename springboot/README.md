@@ -7,11 +7,30 @@ Minimal Spring Boot 3 mock server (only `spring-boot-starter-web`). Requires onl
 ```bash
 ./start.sh                                  # builds target/mock-server.jar if missing/outdated, then starts
 PORT=9090 MOCKS_DIR=/path/to/mocks ./start.sh
+./start.sh --server.port=9090              # extra args are passed to the app
 ```
+
+## Configuring the port
+
+Edit [`config/mock-server.properties`](config/mock-server.properties) and restart (no rebuild needed):
+
+```properties
+server.port=8080
+```
+
+`start.sh` loads it via `--spring.config.additional-location`. Precedence, highest first:
+
+1. CLI arg: `./start.sh --server.port=9090`
+2. `PORT` env var: `PORT=9090 ./start.sh`
+3. `server.port` in `config/mock-server.properties` (or the file named by `CONFIG_FILE`)
+4. Built-in default `8080`
+
+The file is only read by `start.sh`. Running `java -jar target/mock-server.jar` directly uses `PORT` or 8080.
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `PORT` | `8080` | HTTP port |
+| `PORT` | _(unset)_ | HTTP port; overrides the config file |
+| `CONFIG_FILE` | `config/mock-server.properties` | Properties file loaded by `start.sh` (port etc.) |
 | `MOCKS_DIR` | `../mocks` | Directory of `*.json` mock definitions (shared top-level folder) |
 
 ## Endpoints
