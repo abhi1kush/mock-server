@@ -103,4 +103,32 @@ class DynamicMockControllerTests {
            .andExpect(jsonPath("$.availableHandlers[*].name", contains("EchoHandler", "UserHandler", "OrderHandler")))
            .andExpect(jsonPath("$.availableHandlers[1].path").value("/mock/dynamic/users/{id}"));
     }
+
+    @Test
+    void echoHandlesEveryMethod() throws Exception {
+        for (var m : new org.springframework.http.HttpMethod[]{
+                org.springframework.http.HttpMethod.GET, org.springframework.http.HttpMethod.POST,
+                org.springframework.http.HttpMethod.PUT, org.springframework.http.HttpMethod.PATCH,
+                org.springframework.http.HttpMethod.DELETE, org.springframework.http.HttpMethod.OPTIONS}) {
+            mvc.perform(request(m, "/mock/dynamic/echo/m"))
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$.method").value(m.name()));
+        }
+    }
+
+    @Test
+    void headOnGetHandlerReturnsHeadersOnly() throws Exception {
+        mvc.perform(head("/mock/dynamic/users/42"))
+           .andExpect(status().isOk())
+           .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON));
+        mvc.perform(head("/mock/dynamic/echo/h")).andExpect(status().isOk());
+    }
+
+    @Test
+    void optionsReachesHandlerNotSpringDefault() throws Exception {
+        mvc.perform(options("/mock/dynamic/echo/o"))
+           .andExpect(status().isOk())
+           .andExpect(jsonPath("$.method").value("OPTIONS"));
+        mvc.perform(options("/mock/dynamic/orders")).andExpect(status().isNotFound());
+    }
 }

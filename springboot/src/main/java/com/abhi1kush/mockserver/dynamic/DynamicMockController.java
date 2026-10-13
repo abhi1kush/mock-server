@@ -12,6 +12,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -27,13 +28,25 @@ public class DynamicMockController {
         this.mapper = mapper;
     }
 
-    @RequestMapping({BASE, BASE + "/**"})
+    /**
+     * Methods are listed explicitly so OPTIONS reaches the handlers; with no methods declared,
+     * Spring MVC answers OPTIONS itself with an Allow header.
+     */
+    @RequestMapping(value = {BASE, BASE + "/**"}, method = {RequestMethod.GET, RequestMethod.HEAD,
+            RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE,
+            RequestMethod.OPTIONS, RequestMethod.TRACE})
     public ResponseEntity<?> handle(HttpServletRequest request) throws IOException {
         String uri = request.getRequestURI().substring(request.getContextPath().length());
         String path = uri.length() > BASE.length() ? uri.substring(BASE.length()) : "/";
         HttpMethod method = HttpMethod.valueOf(request.getMethod());
         for (DynamicRequestHandler h : handlers) {
             if (h.supports(path, method)) return h.handle(toRequest(request, method, path, h));
+        }
+        // HEAD falls back to a GET handler; the servlet container drops the body.
+        if (method == HttpMethod.HEAD) {
+            for (DynamicRequestHandler h : handlers) {
+                if (h.supports(path, HttpMethod.GET)) return h.handle(toRequest(request, method, path, h));
+            }
         }
         List<Map<String, Object>> available = handlers.stream().map(h -> {
             Map<String, Object> m = new LinkedHashMap<>();

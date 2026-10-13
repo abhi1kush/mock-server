@@ -68,20 +68,107 @@ Handlers receive a `DynamicRequest` record: `method`, `path`, `pathVariables`, `
 | `UserHandler` | `GET /mock/dynamic/users/{id}?greeting=Hi` | deterministic user generated from the id |
 | `OrderHandler` | `POST /mock/dynamic/orders` | validates items and returns subtotal/tax/total (`201`, or `400` with details) |
 
+### curl example per HTTP method
+
+Responses below were pasted from a real run (`HEAD` `Date` header removed). `examples/dynamic-curls.sh` runs all of them against a running server.
+
+**GET: user generated from the path variable and query**
+
 ```bash
-curl -X PUT 'localhost:8080/mock/dynamic/echo/a/b?x=1&x=2' -H 'Content-Type: application/json' -d '{"k":"v"}'
-# {"method":"PUT","path":"/echo/a/b","query":{"x":["1","2"]},"headers":{...},"body":{"k":"v"}}
-
-curl 'localhost:8080/mock/dynamic/users/42?greeting=Hi'
-# {"id":"42","name":"Grace","email":"grace.42@example.com","role":"admin","age":30,"greeting":"Hi, Grace!"}
-
-curl -X POST localhost:8080/mock/dynamic/orders -H 'Content-Type: application/json' \
-  -d '{"items":[{"sku":"A","price":9.99,"quantity":2},{"sku":"B","price":5,"quantity":1}],"taxRate":0.1}'
-# 201 {"orderId":"ORD-...","items":[...],"itemCount":3,"subtotal":24.98,"taxRate":0.1,"tax":2.50,"total":27.48}
-
-curl -X DELETE localhost:8080/mock/dynamic/unknown
-# 404 {"error":"No dynamic handler found",...,"availableHandlers":[...]}
+curl -s 'localhost:8080/mock/dynamic/users/42?greeting=Hi'
 ```
+
+```
+{"id":"42","name":"Grace","email":"grace.42@example.com","role":"admin","age":30,"greeting":"Hi, Grace!"}
+```
+
+**POST: order totals (201)**
+
+```bash
+curl -s -X POST localhost:8080/mock/dynamic/orders -H 'Content-Type: application/json' -d '{"items":[{"sku":"A","price":9.99,"quantity":2},{"sku":"B","price":5,"quantity":1}],"taxRate":0.1}'
+```
+
+```
+{"orderId":"ORD-7CA65AA4","items":[{"sku":"A","price":9.99,"quantity":2,"lineTotal":19.98},{"sku":"B","price":5,"quantity":1,"lineTotal":5.00}],"itemCount":3,"subtotal":24.98,"taxRate":0.1,"tax":2.50,"total":27.48}
+```
+
+**POST: validation error (400)**
+
+```bash
+curl -s -w '\nHTTP %{http_code}\n' -X POST localhost:8080/mock/dynamic/orders -H 'Content-Type: application/json' -d '{"items":[{"sku":"","price":-1,"quantity":0}]}'
+```
+
+```
+{"error":"Invalid order","details":["items[0].sku is required","items[0].price must be a non-negative number","items[0].quantity must be a positive integer"]}
+HTTP 400
+```
+
+**PUT: echo**
+
+```bash
+curl -s -X PUT 'localhost:8080/mock/dynamic/echo/items/7?x=1&x=2' -H 'Content-Type: application/json' -H 'X-Request-Id: abc' -d '{"name":"widget"}'
+```
+
+```
+{"method":"PUT","path":"/echo/items/7","query":{"x":["1","2"]},"headers":{"Content-Type":"application/json","Accept":"*/*","User-Agent":"curl/8.14.1","X-Request-Id":"abc"},"body":{"name":"widget"}}
+```
+
+**PATCH: echo**
+
+```bash
+curl -s -X PATCH localhost:8080/mock/dynamic/echo/items/7 -H 'Content-Type: application/json' -d '{"op":"replace","path":"/name","value":"gadget"}'
+```
+
+```
+{"method":"PATCH","path":"/echo/items/7","query":{},"headers":{"Content-Type":"application/json","Accept":"*/*","User-Agent":"curl/8.14.1"},"body":{"op":"replace","path":"/name","value":"gadget"}}
+```
+
+**DELETE: echo**
+
+```bash
+curl -s -X DELETE localhost:8080/mock/dynamic/echo/items/7
+```
+
+```
+{"method":"DELETE","path":"/echo/items/7","query":{},"headers":{"Accept":"*/*","User-Agent":"curl/8.14.1"},"body":""}
+```
+
+**HEAD: GET handler, headers only (200, no body)**
+
+```bash
+curl -sI localhost:8080/mock/dynamic/users/42
+```
+
+```
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+```
+
+**OPTIONS: echo (routed to the handler, not answered by Spring)**
+
+```bash
+curl -s -X OPTIONS localhost:8080/mock/dynamic/echo/items
+```
+
+```
+{"method":"OPTIONS","path":"/echo/items","query":{},"headers":{"Accept":"*/*","User-Agent":"curl/8.14.1"},"body":""}
+```
+
+**No matching handler (404)**
+
+```bash
+curl -s -w '\nHTTP %{http_code}\n' -X DELETE localhost:8080/mock/dynamic/unknown
+```
+
+```
+{"error":"No dynamic handler found","method":"DELETE","path":"/mock/dynamic/unknown","availableHandlers":[{"name":"EchoHandler","path":"/mock/dynamic/echo/**","methods":["*"]},{"name":"UserHandler","path":"/mock/dynamic/users/{id}","methods":["GET"]},{"name":"OrderHandler","path":"/mock/dynamic/orders","methods":["POST"]}]}
+HTTP 404
+```
+
+Notes:
+- `HEAD` is routed to the matching handler for that method, or to its `GET` handler if it has none. The body is dropped, so `curl -I /mock/dynamic/users/42` returns 200.
+- `OPTIONS` is passed to the handlers like any other method. Before this change Spring MVC answered it itself (`200` with an `Allow` header). A handler that does not list `OPTIONS` returns the usual 404 (for example `OPTIONS /mock/dynamic/orders`).
 
 ### Adding a handler
 
